@@ -11,8 +11,9 @@ import os
 # pip install pocketsphinx
 
 recognizer = sr.Recognizer()
-engine = pyttsx3.init() 
-newsapi = "b118d3d84ba049bbaf0de431143c9f3b"
+engine = pyttsx3.init()
+# Insert your NewsAPI key below. Example: newsapi = "your_newsapi_key_here"
+newsapi = "YOUR_NEWSAPI_KEY_HERE"
 
 def speak_old(text):
     engine.say(text)
@@ -39,8 +40,8 @@ def speak(text):
     os.remove("temp.mp3") 
 
 def aiProcess(command):
-    client = OpenAI(api_key="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",
-    )
+    # Insert your OpenAI API key below. Example: api_key="your_openai_api_key_here"
+    client = OpenAI(api_key="YOUR_OPENAI_API_KEY_HERE")
 
     completion = client.chat.completions.create(
     model="gpt-3.5-turbo",
