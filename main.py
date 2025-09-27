@@ -125,8 +125,17 @@ def processCommand(c):
             print("[DEBUG] Failed to fetch news.")
             speak("Failed to fetch news.")
     else:
-        output = aiProcess(c)
-        speak(output) 
+        # Fallback: open YouTube for music/video, Google for other topics
+        import urllib.parse
+        query = urllib.parse.quote(c)
+        if "music" in c.lower() or "song" in c.lower() or "video" in c.lower():
+            youtube_search_url = f"https://www.youtube.com/results?search_query={query}"
+            webbrowser.open(youtube_search_url)
+            speak(f"Searching YouTube for {c}")
+        else:
+            google_search_url = f"https://www.google.com/search?q={query}"
+            webbrowser.open(google_search_url)
+            speak(f"Searching Google for {c}")
 
 
 
