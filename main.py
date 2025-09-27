@@ -13,7 +13,20 @@ import os
 recognizer = sr.Recognizer()
 engine = pyttsx3.init()
 # Insert your NewsAPI key below. Example: newsapi = "your_newsapi_key_here"
-newsapi = "YOUR_NEWSAPI_KEY_HERE"
+newsapi = "your_newsapi_key_here"
+
+# Wake word configuration
+# Primary wake words (spoken normally)
+WAKE_PRIMARY = ["jarvis"]
+# Short/fallback variants that should wake Jarvis but should not be mentioned back
+FALLBACK_WAKE_WORDS = ["jar", "jarv", "vish"]
+
+def _normalize_text(s: str) -> str:
+    import re
+    s = (s or "").lower().strip()
+    s = re.sub(r"[^a-z0-9\s]", "", s)
+    s = re.sub(r"\s+", " ", s)
+    return s
 
 def speak_old(text):
     engine.say(text)
@@ -41,7 +54,7 @@ def speak(text):
 
 def aiProcess(command):
     # Insert your OpenAI API key below. Example: api_key="your_openai_api_key_here"
-    client = OpenAI(api_key="YOUR_OPENAI_API_KEY_HERE")
+    client = OpenAI(api_key="your_openai_api_key_here")
 
     completion = client.chat.completions.create(
     model="gpt-3.5-turbo",
@@ -54,14 +67,42 @@ def aiProcess(command):
     return completion.choices[0].message.content
 
 def processCommand(c):
-    if "open google" in c.lower():
+    low = c.lower()
+    if "open google" in low:
+        speak("Opening Google")
         webbrowser.open("https://google.com")
-    elif "open facebook" in c.lower():
+    elif "open facebook" in low:
+        speak("Opening Facebook")
         webbrowser.open("https://facebook.com")
-    elif "open youtube" in c.lower():
+    elif "open youtube" in low:
+        speak("Opening YouTube")
         webbrowser.open("https://youtube.com")
-    elif "open linkedin" in c.lower():
+    elif "open linkedin" in low:
+        speak("Opening LinkedIn")
         webbrowser.open("https://linkedin.com")
+    elif low.startswith("open "):
+        # Generic open handler: announce then try to open a sensible URL
+        target = c.split(" ", 1)[1].strip()
+        # Spoken title: capitalize nicely
+        title = target.title()
+        speak(f"Opening {title}")
+        # Map some common words to URLs
+        mapping = {
+            "google": "https://google.com",
+            "youtube": "https://youtube.com",
+            "facebook": "https://facebook.com",
+            "linkedin": "https://linkedin.com",
+            "github": "https://github.com",
+        }
+        t_low = target.lower()
+        if t_low in mapping:
+            webbrowser.open(mapping[t_low])
+        else:
+            # If it looks like a URL, open it; otherwise try https://{target}.com
+            if t_low.startswith("http://") or t_low.startswith("https://") or "." in t_low:
+                webbrowser.open(target if target.startswith("http") else f"https://{target}")
+            else:
+                webbrowser.open(f"https://{t_low}.com")
     elif c.lower().startswith("play"):
         song = c.split(" ", 1)[1].strip()
         # Case-insensitive lookup
@@ -112,7 +153,7 @@ def processCommand(c):
                     r_stop = sr.Recognizer()
                     with sr.Microphone() as source:
                         try:
-                            audio_stop = r_stop.listen(source, timeout=1, phrase_time_limit=1)
+                            audio_stop = r_stop.listen(source, timeout=2, phrase_time_limit=1)
                             command_stop = r_stop.recognize_google(audio_stop).lower().strip()
                             if "stop" in command_stop:
                                 print("[DEBUG] Stop command detected. Interrupting news.")
@@ -145,26 +186,44 @@ def processCommand(c):
 if __name__ == "__main__":
     speak("Initializing Jarvis....")
     while True:
-        # Listen for the wake word "Jarvis"
-        # obtain audio from the microphone
+        # Listen for a short phrase, then check for wake variants
         r = sr.Recognizer()
-         
         print("recognizing...")
         try:
             with sr.Microphone() as source:
                 print("Listening...")
-                audio = r.listen(source, timeout=2, phrase_time_limit=1)
-            word = r.recognize_google(audio)
-            print(f"[DEBUG] Wake word recognized: {word}")
-            if(word.lower() == "jarvis"):
+                audio = r.listen(source, timeout=2, phrase_time_limit=2)
+
+            try:
+                transcript = r.recognize_google(audio)
+            except Exception as e:
+                print(f"[DEBUG] Could not decode audio: {e}")
+                continue
+
+            print(f"[DEBUG] Transcript: {transcript}")
+            norm = _normalize_text(transcript)
+            tokens = norm.split()
+
+            # Check primary and fallback wake words
+            woke = False
+            for w in WAKE_PRIMARY + FALLBACK_WAKE_WORDS:
+                if w in tokens:
+                    woke = True
+                    break
+
+            if woke:
+                # Do not echo which wake token was used; keep a neutral acknowledgement
                 speak("Yes Sir")
+                # Listen for the command following wake
                 with sr.Microphone() as source:
                     print("Jarvis Active...")
-                    audio = r.listen(source)
+                    audio = r.listen(source, timeout=5, phrase_time_limit=8)
+                try:
                     command = r.recognize_google(audio)
                     print(f"[DEBUG] Command recognized: {command}")
                     processCommand(command)
-
+                except Exception as e:
+                    print(f"[DEBUG] Failed to recognize command: {e}")
 
         except Exception as e:
             print("Error; {0}".format(e))
